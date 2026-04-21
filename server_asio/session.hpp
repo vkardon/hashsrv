@@ -51,25 +51,44 @@ inline void Session::ReadData()
                 std::istream is(&mStreamBuffer);
                 std::string line;
                 
-                // getline reads up to '\n' and discards the delimiter
-                if(std::getline(is, line))
+                // If the client sends 5 lines at once, this handles them in order
+                if(std::getline(is, line)) 
                 {
-                    // Remove potential '\r' if client uses CRLF
-                    if(!line.empty() && line.back() == '\r')
+                    if(line.empty()) 
                     {
-                        line.pop_back();
+                        ReadData(); // Skip empty line and look for the next one
+                        return;
                     }
 
+                    // Adjust for potential \r
+                    if(line.back() == '\r') 
+                        line.pop_back();
+
+                    // Reset Context for fresh hash
+                    EVP_DigestInit_ex(mHashCtx, EVP_sha256(), nullptr);
+                    
+                    // Hash the data
                     EVP_DigestUpdate(mHashCtx, line.data(), line.length());
 
                     unsigned char hash[EVP_MAX_MD_SIZE]{0};
                     unsigned int len{0};
                     EVP_DigestFinal_ex(mHashCtx, hash, &len);
 
+                    // Convert and Send
                     std::string hexResult;
                     HexToString(hexResult, hash, len); 
                     SendData(hexResult);
                 }
+                else 
+                {
+                    // Fallback: If we were woken up but couldn't get a line,
+                    // keep the session alive by reading more.
+                    ReadData();
+                }
+            }
+            else 
+            {
+                // TODO: Handle/Log disconnect or error - session will die here
             }
         });
 }
@@ -99,22 +118,20 @@ inline void Session::HexToString(std::string& dest, const void* hash, int len) c
     // Lookup table for hex digits
     static const char* lut = "0123456789abcdef";
 
-    // Resize to accommodate hex characters plus the trailing newline
-    size_t oldSize = dest.size();
-    dest.resize(oldSize + (len * 2) + 1);
+    // Reserve to accommodate hex characters plus the trailing newline
+    dest.clear();
+    dest.reserve((len * 2) + 1);
 
     // Tight loop using bit-shifting (fastest way to split a byte)
     const uint8_t* data = static_cast<const uint8_t*>(hash);
-    char* ptr = dest.data();
-
     for(int i = 0; i < len; ++i) 
     {
-        *ptr++ = lut[data[i] >> 4];   // High nibble
-        *ptr++ = lut[data[i] & 0x0f]; // Low nibble
+        dest.push_back(lut[data[i] >> 4]);   // High nibble
+        dest.push_back(lut[data[i] & 0x0f]); // Low nibble
     }
 
     // Append newline terminator
-    dest.back() = '\n';
+    dest.push_back('\n');
 }
 
 
