@@ -3,14 +3,19 @@
 //
 #include "hashServer.hpp"
 #include <signal.h>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
 
-// Handler for SIGHUP, SIGINT, SIGQUIT and SIGTERM
-volatile static sig_atomic_t gSignalNumber{0};
+// Synchronizing primitives
+static std::atomic<int> gSignalNumber{0};
+static std::mutex gSignalMutex;
+static std::condition_variable gSignalCV;
 
 extern "C"
 void HandlerExitSignal(int signalNumber)
 {
-    // Once we are in this handler, block all the signals that trigger this handler
+    // Block signals to prevent nested handler calls
     sigset_t blockSignals;
     sigemptyset(&blockSignals);
     sigaddset(&blockSignals, SIGHUP);
@@ -22,7 +27,13 @@ void HandlerExitSignal(int signalNumber)
     const char* msg = "Got a signal\n";
     write(STDOUT_FILENO, msg, strlen(msg));
 
+    // Update state
     gSignalNumber = signalNumber;
+
+    // Wake up the observer thread.
+    // Note: notify_all is one of the few thread-safe calls allowed here.
+    // Since we use an atomic, the observer will definitely see the change.
+    gSignalCV.notify_all();
 }
 
 int Signal(int signum, void (*handler)(int))
@@ -51,26 +62,30 @@ int main()
     HashServer server(threadsCount);
     // server.SetVerbose(true);
 
-    // Starts a helper thread to monitor the exit signal
+    // Starts the observer thread to monitor the exit signal
     std::thread signalObserverThread([&server]() 
     {
-        while(gSignalNumber == 0)
-            usleep(500000);
+        // Wait until gSignalNumber is no longer 0
+        std::unique_lock<std::mutex> lock(gSignalMutex);
+        gSignalCV.wait(lock, []{ return gSignalNumber != 0; });
 
-        // We got a signal. Stop the server.
-        std::cout << __FNAME__<< ":" << __LINE__ << " Got a signal " << gSignalNumber 
-                  << " (" << strsignal(gSignalNumber) << "), exiting..." << std::endl;
-        server.Stop();
+        if(gSignalNumber > 0)   
+        {
+            std::cout << __FILE__ << ":" << __LINE__ << " Got a signal " << gSignalNumber 
+                      << " (" << strsignal(gSignalNumber) << "), exiting..." << std::endl;
+            server.Stop();
+        }
     });
 
     // Start HashServer
     if(!server.Start(8080))
     {
         std::cerr << "Failed to start the epoll server." << std::endl;
-        return 1;
+        gSignalNumber = -1;  
+        gSignalCV.notify_all(); // Wake observer thread to join and exit    
     }
 
-    // Join the helper thread and exit
+    // Join the observer thread and exit
     signalObserverThread.join();
     return 0;
 }
