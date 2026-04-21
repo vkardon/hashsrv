@@ -26,7 +26,8 @@ OBJ_DIR = $(PROJECT_HOME)/_obj
 SRCS = $(PROJECT_HOME)/client.cpp
 
 # Include directories
-INCS = -I$(PROJECT_HOME)
+INCS = -I$(PROJECT_HOME) \
+       -I$(PROJECT_HOME)/../server_epool/include
 
 # Libraries
 LIBS = 

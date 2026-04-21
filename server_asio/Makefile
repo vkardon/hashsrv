@@ -23,7 +23,7 @@ endif
 PROJECT_HOME = .
 OBJ_DIR = $(PROJECT_HOME)/_obj
 
-SRCS = $(PROJECT_HOME)/main.cpp 
+SRCS = $(PROJECT_HOME)/main.cpp
 
 # Include directories
 INCS = -I$(PROJECT_HOME)/include

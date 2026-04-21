@@ -1,5 +1,5 @@
 //
-// server.cpp
+// main.cpp
 //
 #include "hashServer.hpp"
 #include <signal.h>

@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <signal.h>
-#include <chrono>
+#include "utils.hpp"
 
 const int PORT = 8080;
 
@@ -119,7 +119,7 @@ void RunTest(int numThreads, int numOfCallsPerThread)
                 if(client.Call(req, resp)) 
                 {
                     // Silence output in stress test to avoid console lag
-                    std::cout << "[" << i << "] Req: '" << req << "', Resp: '" << resp << "'" << std::endl;
+                    //std::cout << "[" << i << "] Req: '" << req << "', Resp: '" << resp << "'" << std::endl;
                 }
             }
         });
@@ -135,23 +135,27 @@ int main()
     // signal. We don't want to die if this happens, so we ignore SIGPIPE.
     signal(SIGPIPE, SIG_IGN);
 
-    // int numOfThreadsPerRun = 500;
-    // int numOfCallsPerThread = 500;
-    // int numOfRuns = 10;
+    int numOfThreadsPerRun = 500;
+    int numOfCallsPerThread = 500;
+    int numOfRuns = 10;
 
-    int numOfThreadsPerRun = 5;
-    int numOfCallsPerThread = 5;
-    int numOfRuns = 1;
+    // int numOfThreadsPerRun = 5;
+    // int numOfCallsPerThread = 5;
+    // int numOfRuns = 1;
 
     std::cout << "Running:\n"
             << "  Number of threads          : " << numOfThreadsPerRun << "\n"
             << "  Number of calls per thread : " << numOfCallsPerThread << "\n"
             << "  Number of runs             : " << numOfRuns << std::endl;
-
-    for(int i = 0; i < numOfRuns; i++)
+    
     {
-        std::cout << "Run " << i << std::endl;
-        RunTest(numOfThreadsPerRun, numOfCallsPerThread);
+        gen::StopWatch sw;
+
+        for(int i = 0; i < numOfRuns; i++)
+        {
+            std::cout << "Run " << i << std::endl;
+            RunTest(numOfThreadsPerRun, numOfCallsPerThread);
+        }
     }
 
     std::cout << "Done:\n"

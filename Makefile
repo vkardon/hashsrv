@@ -1,6 +1,7 @@
 # Top-level Makefile
 SUBDIRS = client \
-          server_epool
+          server_epool \
+          server_asio
 
 # Default target: build all subdirectories
 all: $(SUBDIRS)

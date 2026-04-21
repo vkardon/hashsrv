@@ -41,7 +41,7 @@ private:
     void OnError(const char* fname, int lineNum, const std::string& err) const override;
     void OnInfo(const char* fname, int lineNum, const std::string& info) const override;
 
-    void AppendHex(std::string& dest, const void* hash, int len);
+    void AppendHex(std::string& dest, const void* hash, int len) const;
 };
 
 inline std::shared_ptr<gen::EpollServer::ClientContext> HashServer::MakeClientContext()
@@ -172,7 +172,7 @@ inline bool HashServer::OnWrite(std::shared_ptr<ClientContext>& clientIn)
 }
 
 // Appends hex data followed by a newline directly to a buffer
-void HashServer::AppendHex(std::string& dest, const void* hash, int len)
+void HashServer::AppendHex(std::string& dest, const void* hash, int len) const
 {
     size_t oldSize = dest.size();
     dest.resize(oldSize + (len * 2) + 1);
