@@ -14,27 +14,27 @@ find_package(OpenSSL REQUIRED)
 find_path(ASIO_INCLUDE_DIR asio.hpp)
 
 # Define the Executable
-add_executable(server_asio 
+add_executable(server 
     src/main.cpp
     # Add other source files here
 )
 
 # Include Directories
-target_include_directories(server_asio PRIVATE 
+target_include_directories(server PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${ASIO_INCLUDE_DIR}
     ${OPENSSL_INCLUDE_DIR}
 )
 
 # Link Libraries: libssl, libcrypto, pthread
-target_link_libraries(server_asio PRIVATE 
+target_link_libraries(server PRIVATE 
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
 )
 
 # Compiler Flags: -Wall
-target_compile_options(server_asio PRIVATE -Wall)
+target_compile_options(server PRIVATE -Wall)
 
 # CMake handles Debug/Release automatically via CMAKE_BUILD_TYPE.
 # If CMAKE_BUILD_TYPE is "Release", it adds -O3 and -DNDEBUG.
