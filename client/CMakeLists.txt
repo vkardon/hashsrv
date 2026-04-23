@@ -17,7 +17,7 @@ add_executable(client
 
 # Include Directories
 target_include_directories(client PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../server_epool/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
     # Add other directories here
 )
 

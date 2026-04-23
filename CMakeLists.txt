@@ -12,6 +12,5 @@ endif()
 
 # Add the sub-projects
 add_subdirectory(client)
-add_subdirectory(server_asio)
-add_subdirectory(server_epool)
+add_subdirectory(server)
 

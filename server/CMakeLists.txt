@@ -15,12 +15,13 @@ find_path(ASIO_INCLUDE_DIR asio.hpp)
 
 # Define the Executable
 add_executable(server_asio 
-    main.cpp
+    src/main.cpp
     # Add other source files here
 )
 
 # Include Directories
 target_include_directories(server_asio PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${ASIO_INCLUDE_DIR}
     ${OPENSSL_INCLUDE_DIR}
 )
@@ -41,5 +42,48 @@ target_compile_options(server_asio PRIVATE -Wall)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
+
+# --- Testing Section ---
+enable_testing()
+
+# Optional: Helping CMake find GTest on RHEL/Alma/Fedora
+# set(GTEST_ROOT /usr/src/gtest)
+find_package(GTest REQUIRED)
+
+add_executable(session_test tests/sessionTest.cpp)
+
+# Link everything session_test needs
+target_link_libraries(session_test PRIVATE 
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Threads::Threads
+    GTest::gtest_main
+)
+
+# Ensure the test can find your session.hpp
+target_include_directories(session_test PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${ASIO_INCLUDE_DIR}
+)
+
+add_test(NAME SessionLogicTest COMMAND session_test)
+
+# --- Server Integration Test ---
+add_executable(server_test tests/serverTest.cpp)
+
+target_link_libraries(server_test PRIVATE 
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Threads::Threads
+    GTest::gtest_main
+)
+
+target_include_directories(server_test PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${ASIO_INCLUDE_DIR}
+)
+
+add_test(NAME ServerIntegrationTest COMMAND server_test)
+
 
 
