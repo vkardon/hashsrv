@@ -172,3 +172,4 @@ inline void Session::HexToString(std::string& dest, const void* hash, int len) c
 
 
 #endif // __SESSION_HPP__
+

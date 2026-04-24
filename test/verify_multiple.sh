@@ -104,8 +104,8 @@ else
     echo "    The server smushed or misparsed the data stream."
     echo ""
     echo "SIDE-BY-SIDE (Left: Individual | Right: Stream)"
-    diff -y "$TEMP_BASELINE" "$TEMP_STREAM"
-    
+    #diff -y "$TEMP_BASELINE" "$TEMP_STREAM"
+    diff --side-by-side --suppress-common-lines "$TEMP_BASELINE" "$TEMP_STREAM"
     rm -f "$TEMP_BASELINE" "$TEMP_STREAM"
     exit 1
 fi

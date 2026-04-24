@@ -103,7 +103,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     else
         echo -e ${FAIL_ICON} "Line $LINE_NUM: FAILED"
         echo "   Sent:     [$line]"
-        echo "   Expected: $EXPECTED"
+        echo "   Expected: [$EXPECTED]"
         echo "   Actual:   [$ACTUAL]"
         FAILED=1
         break # Exit on failure
