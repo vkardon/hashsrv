@@ -8,6 +8,7 @@
 #include <cstring>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <signal.h>
 #include "utils.hpp"
@@ -15,7 +16,7 @@
 class EchoClient
 {
 public:
-    EchoClient(const std::string& ip, int port) : mIp(ip), mPort(port), mSock(-1) {}
+    EchoClient(const std::string& host, int port) : mHost(host), mPort(port), mSock(-1) {}
     ~EchoClient() 
     {
         if(mSock != -1) 
@@ -31,11 +32,18 @@ public:
             return false;
         }
 
+        struct hostent* server = gethostbyname(mHost.c_str());
+        if (server == nullptr) 
+        {
+            std::cerr << "Error: Could not resolve hostname " << mHost << std::endl;
+            return false;
+        }
+
         struct sockaddr_in serverAddr;
         memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(mPort);
-        inet_pton(AF_INET, mIp.c_str(), &serverAddr.sin_addr);
+        memcpy(&serverAddr.sin_addr.s_addr, server->h_addr, server->h_length);
 
         if(connect(mSock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) 
         {
@@ -91,21 +99,22 @@ public:
     }
 
 private:
-    std::string mIp;
+    std::string mHost;
     unsigned int mPort{0};
     int mSock{0};
 };
 
-void RunTest(unsigned short port, int numThreads, int numOfCallsPerThread)
+void RunTest(const std::string& host, unsigned short port, 
+             int numThreads, int numOfCallsPerThread)
 {
     // Create and start multiple threads
     std::vector<std::thread> threads;
 
     for(int i = 0; i < numThreads; ++i)
     {
-        threads.emplace_back([port, i, numOfCallsPerThread]()
+        threads.emplace_back([host, port, i, numOfCallsPerThread]()
         {
-            EchoClient client("127.0.0.1", port);
+            EchoClient client(host, port);
             if(!client.Connect()) 
                 return;
 
@@ -157,10 +166,18 @@ unsigned short ReadPortNumber(const char* portStr)
 
 int main(int argc, char* argv[])
 {
-    // Default to 8080, but override if an argument is provided
-    unsigned short port = (argc > 1 ? ReadPortNumber(argv[1]) : 8080);
-    if(port == 0)
+    // Check if we have exactly 2 arguments (prog_name host port)
+    if(argc < 3) 
+    {
+        std::cerr << "Usage: " << argv[0] << " <hostname/ip> <port>" << std::endl;
+        std::cerr << "Example: " << argv[0] << " 127.0.0.1 8080" << std::endl;
         return 1;
+    }
+
+    std::string host = argv[1];
+    unsigned short port = ReadPortNumber(argv[2]);
+    if (port == 0)
+        return 1; // ReadPortNumber handles its own error messages
 
     // Writing to an unconnected socket will cause a process to receive a SIGPIPE
     // signal. We don't want to die if this happens, so we ignore SIGPIPE.
@@ -185,7 +202,7 @@ int main(int argc, char* argv[])
         for(int i = 0; i < numOfRuns; i++)
         {
             std::cout << "Run " << i << std::endl;
-            RunTest(port, numOfThreadsPerRun, numOfCallsPerThread);
+            RunTest(host, port, numOfThreadsPerRun, numOfCallsPerThread);
         }
     }
 
