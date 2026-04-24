@@ -7,9 +7,14 @@
 #include <chrono>
 #include <vector>
 #include "server.hpp"
+#include "sessionTestWrapper.hpp"
+
 
 class ServerTest : public ::testing::Test 
 {
+public:
+    ServerTest() { std::srand(std::time(nullptr)); }
+
 protected:
     // Helper to find a random available port from the OS
     unsigned short get_free_port()
@@ -17,6 +22,30 @@ protected:
         asio::io_context ioc;
         tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), 0));
         return acceptor.local_endpoint().port();
+    }
+
+    // Generate a payload, send it to server and verify the response hash
+    void ExchangeAndVerify(asio::ip::tcp::socket& clientSocket, int id = 0) const
+    {
+        // Generate unique payload and calculate the expected result
+        std::string inputData = "Calculate_SHA256_Integrity_Check: Request_ID_" + 
+                                 std::to_string(id) + "_" + std::to_string(std::rand());
+        std::string expected = CalculateExpected(inputData);
+
+        // Append newline to trigger ProcessBuffer logic and write to the stream
+        std::string request = inputData + "\n";
+        std::error_code ec;
+        asio::write(clientSocket, asio::buffer(request), ec);
+        ASSERT_FALSE(ec) << "Write failed on id " << id;
+
+        // Read the specific response for this request
+        std::vector<char> responseBuffer(1024);
+        std::size_t n = clientSocket.read_some(asio::buffer(responseBuffer), ec);
+        ASSERT_FALSE(ec) << "Failed to receive hash for: " << inputData;
+        
+        // Verify
+        std::string actual(responseBuffer.data(), n);
+        EXPECT_EQ(actual, expected) << "Server hash mismatch: for id=" << id << ", input='" << inputData << "'";
     }
 };
 
@@ -124,33 +153,87 @@ TEST_F(ServerTest, PortInUseThrows)
     EXPECT_THROW({ Server server(port); }, asio::system_error);
 }
 
-TEST_F(ServerTest, HandlesThunderingHerd) 
+// Open a single connection, make multiple responses and verify the results
+TEST_F(ServerTest, VerifyIndividualHashResponse) 
 {
+    // Setup Server on a dynamic port
     unsigned short port = get_free_port();
     Server server(port);
-    std::thread serverThread([&server]()
-    { 
-        server.Run(); 
-    });
+    std::thread serverThread([&server]() { server.Run(); });
+    
+    // Allow io_context to spin up
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-    // Connect significantly more clients than hardware threads
-    const int burstSize = std::thread::hardware_concurrency() * 10;
-    std::vector<std::unique_ptr<tcp::socket>> clients;
+    // Establish connection
     asio::io_context clientIoc;
+    asio::ip::tcp::socket clientSocket(clientIoc);
+    std::error_code ec;
+    clientSocket.connect(tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), port), ec);
+    ASSERT_FALSE(ec) << "Failed to connect to local server for integrity test.";
 
-    for(int i = 0; i < burstSize; ++i)
+    // Send data
+    const int requestCount = 100;
+    for(int i = 0; i < requestCount; ++i)
     {
-        auto sock = std::make_unique<tcp::socket>(clientIoc);
-        std::error_code ec;
-        sock->connect(tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), port), ec);
-        EXPECT_FALSE(ec);
-        clients.push_back(std::move(sock));
+        ExchangeAndVerify(clientSocket, i);
     }
 
-    // Cleanup
+    // Cleanup (bring the server down with SIGINT)
+    clientSocket.close();
     raise(SIGINT);
     if(serverThread.joinable())
         serverThread.join();
 }
+
+// Open multiple connections (significantly more than hardware threads).
+// Make multiple responses from every connection and verify the results.
+TEST_F(ServerTest, HandlesThunderingHerd) 
+{
+    unsigned short port = get_free_port();
+    Server server(port);
+    std::thread serverThread([&server]() { server.Run(); });
+
+    // Allow io_context to spin up
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Connect significantly more clients than hardware threads
+    const int clientCount = std::thread::hardware_concurrency() * 10;
+    std::vector<std::unique_ptr<tcp::socket>> clients;
+    asio::io_context clientIoc;
+
+    // Connection Phase (connect all clients)
+    for(int i = 0; i < clientCount; ++i)
+    {
+        auto sock = std::make_unique<tcp::socket>(clientIoc);
+        std::error_code ec;
+        sock->connect(tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), port), ec);
+        ASSERT_FALSE(ec) << "Client " << i << " failed to connect";
+        clients.push_back(std::move(sock));
+    }
+
+    // Each client communicates with the server in parallel
+    std::vector<std::future<void>> futures;
+    const int requestsPerClient = 100;
+
+    for(int i = 0; i < clientCount; ++i)
+    {
+        // Launch each client's conversation in its own thread
+        futures.push_back(std::async(std::launch::async, [this, &sock = *clients[i], i, requestsPerClient]() 
+            {
+                for(int n = 0; n < requestsPerClient; ++n) 
+                {
+                    this->ExchangeAndVerify(sock, n);
+                }
+            }));
+    }
+
+    // Wait for clients to finish
+    for (auto& f : futures)
+        f.get(); 
+
+    // Cleanup (bring the server down with SIGINT)
+    raise(SIGINT);
+    if(serverThread.joinable())
+        serverThread.join();
+}
+

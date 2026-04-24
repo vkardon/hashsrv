@@ -2,19 +2,8 @@
 // sessionTest.cpp
 //
 #include <gtest/gtest.h>
-#include "session.hpp"
+#include "sessionTestWrapper.hpp"
 #include <asio.hpp>
-
-// Create a wrapper to access protected/private members for testing
-class SessionTestWrapper : public Session 
-{
-public:
-    // Promotion: Make these protected methods public for testing
-    using Session::Session;
-    using Session::ProcessBuffer;
-    using Session::HexToString;
-    using Session::mTailBuffer;
-};
 
 TEST(SessionTest, HexConversionIsCorrect) 
 {
