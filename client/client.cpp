@@ -12,8 +12,6 @@
 #include <signal.h>
 #include "utils.hpp"
 
-const int PORT = 8080;
-
 class EchoClient
 {
 public:
@@ -98,16 +96,16 @@ private:
     int mSock{0};
 };
 
-void RunTest(int numThreads, int numOfCallsPerThread)
+void RunTest(unsigned short port, int numThreads, int numOfCallsPerThread)
 {
     // Create and start multiple threads
     std::vector<std::thread> threads;
 
     for(int i = 0; i < numThreads; ++i)
     {
-        threads.emplace_back([i, numOfCallsPerThread]()
+        threads.emplace_back([port, i, numOfCallsPerThread]()
         {
-            EchoClient client("127.0.0.1", PORT);
+            EchoClient client("127.0.0.1", port);
             if(!client.Connect()) 
                 return;
 
@@ -129,8 +127,41 @@ void RunTest(int numThreads, int numOfCallsPerThread)
         thread.join();
 }
 
-int main()
+unsigned short ReadPortNumber(const char* portStr)
 {
+    // Check for nullptr first!
+    if(portStr == nullptr) 
+    {
+        std::cerr << "Error: Port string is null." << std::endl;
+        return 0;
+    }
+
+    try 
+    {
+        int port = std::stoi(portStr);
+        if(port < 1 || port > 65535)
+            throw std::out_of_range("Port number " + std::to_string(port) + " is out of valid range (1-65535)");
+        return static_cast<unsigned short>(port);          
+    } 
+    catch(const std::exception& e)
+    {
+        std::cerr << "Runtime exception: " << e.what() << std::endl;
+        return 0;
+    }
+    catch(...)
+    {
+        std::cerr << "Unknown c++ exception" << std::endl;
+        return 0;
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    // Default to 8080, but override if an argument is provided
+    unsigned short port = (argc > 1 ? ReadPortNumber(argv[1]) : 8080);
+    if(port == 0)
+        return 1;
+
     // Writing to an unconnected socket will cause a process to receive a SIGPIPE
     // signal. We don't want to die if this happens, so we ignore SIGPIPE.
     signal(SIGPIPE, SIG_IGN);
@@ -154,7 +185,7 @@ int main()
         for(int i = 0; i < numOfRuns; i++)
         {
             std::cout << "Run " << i << std::endl;
-            RunTest(numOfThreadsPerRun, numOfCallsPerThread);
+            RunTest(port, numOfThreadsPerRun, numOfCallsPerThread);
         }
     }
 
