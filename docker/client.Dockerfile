@@ -1,5 +1,5 @@
 # --- STAGE 1: Build ---
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake
@@ -14,9 +14,10 @@ RUN cd client && \
     make -j$(nproc)
 
 # --- STAGE 2: Runtime ---
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 WORKDIR /app
 # Note: Adjust path to where the binary actually ends up
 COPY --from=builder /build_context/client/build/client .
 
 ENTRYPOINT ["./client"]
+
