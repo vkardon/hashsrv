@@ -25,13 +25,6 @@ public:
 
     bool Connect() 
     {
-        mSock = socket(AF_INET, SOCK_STREAM, 0);
-        if(mSock < 0) 
-        {
-            std::cerr << "Failed to create socket: " << std::strerror(errno) << std::endl;
-            return false;
-        }
-
         struct hostent* server = gethostbyname(mHost.c_str());
         if (server == nullptr) 
         {
@@ -45,15 +38,40 @@ public:
         serverAddr.sin_port = htons(mPort);
         memcpy(&serverAddr.sin_addr.s_addr, server->h_addr, server->h_length);
 
-        if(connect(mSock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) 
+        int retries = 5;
+        while(retries > 0) 
         {
-            std::cerr << "Connection failed to " 
-                      << inet_ntoa(serverAddr.sin_addr) << ":" << ntohs(serverAddr.sin_port) 
-                      << ", Error: " << std::strerror(errno) << std::endl;            
-                      return false;
+            mSock = socket(AF_INET, SOCK_STREAM, 0);
+            if(mSock < 0) 
+            {
+                std::cerr << "Failed to create socket: " << std::strerror(errno) << std::endl;
+                return false;
+            }
+
+            if(connect(mSock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == 0) 
+            {
+                return true; // Success!            
+            }
+
+            // If we failed, clean up and wait a bit
+            close(mSock);
+            mSock = -1;
+            retries--;
+
+            if(retries > 0) 
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            else
+            {
+                std::cerr << "Connection failed to " 
+                          << inet_ntoa(serverAddr.sin_addr) << ":" << ntohs(serverAddr.sin_port) 
+                          << ", Error: " << std::strerror(errno) << std::endl;            
+            }
         }
 
-        return true;
+        // If we get here, all retries failed
+        return false;
     }
 
     bool Call(const std::string& msg, std::string& response) 
@@ -112,6 +130,9 @@ void RunTest(const std::string& host, unsigned short port,
 
     for(int i = 0; i < numThreads; ++i)
     {
+        // A small delay every few threads or even every thread
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
         threads.emplace_back([host, port, i, numOfCallsPerThread]()
         {
             EchoClient client(host, port);
@@ -192,8 +213,8 @@ int main(int argc, char* argv[])
     // int numOfRuns = 1;
 
     std::cout << "Running:\n"
-            << "  Number of threads          : " << numOfThreadsPerRun << "\n"
-            << "  Number of calls per thread : " << numOfCallsPerThread << "\n"
+            << "  Number of clients          : " << numOfThreadsPerRun << "\n"
+            << "  Number of calls per client : " << numOfCallsPerThread << "\n"
             << "  Number of runs             : " << numOfRuns << std::endl;
     
     {

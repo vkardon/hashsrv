@@ -34,20 +34,26 @@ private:
 
 inline Server::Server(unsigned short port) 
     : mSignals(mIoContext),
-      mAcceptor(mIoContext, tcp::endpoint(tcp::v4(), port)), 
+      mAcceptor(mIoContext), 
       mPort(port)
 {
+    // Manual setup to allow high-concurrency options (max backlog)
+    mAcceptor.open(tcp::v4());
+    mAcceptor.set_option(tcp::acceptor::reuse_address(true));
+    mAcceptor.bind(tcp::endpoint(tcp::v4(), port));
+    mAcceptor.listen(asio::socket_base::max_listen_connections); // set the backlog to maximum
+
     mSignals.add(SIGINT);
     mSignals.add(SIGTERM);
     mSignals.add(SIGHUP);
     mSignals.add(SIGQUIT);
-
-    WaitForSignals();   // Start listening for signals
-    DoAccept();         // Setup the first listener
 }
 
 inline void Server::Run()
 {
+    WaitForSignals();   // Start listening for signals
+    DoAccept();         // Setup the first listener
+
     unsigned int threadCount = std::thread::hardware_concurrency();
     std::cout << "Server starting on port " << mPort << " with " << threadCount << " threads..." << std::endl;
 

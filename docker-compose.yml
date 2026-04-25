@@ -1,0 +1,26 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8080:8080"  # Maps host's 8080 to the container's 8080
+    # The healthcheck acts as a gatekeeper
+    healthcheck:
+      # This command tries to open a TCP connection to port 8080
+      test: ["CMD", "timeout", "1", "bash", "-c", "</dev/tcp/localhost/8080"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 2s
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    depends_on:
+      server:
+        condition: service_healthy  # This is the key!
+    # We tell the client to connect to the 'server' service name
+    command: ["server", "8080"]
+    
