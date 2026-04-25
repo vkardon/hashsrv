@@ -10,8 +10,6 @@
 #include <vector>
 #include "session.hpp"
 
-using asio::ip::tcp;
-
 class Server
 {
 public:
@@ -27,7 +25,7 @@ private:
     // Note: mIoContext must be initialized before mAcceptor (Order of members matters)
     asio::io_context mIoContext;
     asio::signal_set mSignals;
-    tcp::acceptor mAcceptor;
+    asio::ip::tcp::acceptor mAcceptor;
     std::vector<std::thread> mThreads;
     unsigned short mPort{0};
 };
@@ -38,9 +36,9 @@ inline Server::Server(unsigned short port)
       mPort(port)
 {
     // Manual setup to allow high-concurrency options (max backlog)
-    mAcceptor.open(tcp::v4());
-    mAcceptor.set_option(tcp::acceptor::reuse_address(true));
-    mAcceptor.bind(tcp::endpoint(tcp::v4(), port));
+    mAcceptor.open(asio::ip::tcp::v4());
+    mAcceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+    mAcceptor.bind(asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port));
     mAcceptor.listen(asio::socket_base::max_listen_connections); // set the backlog to maximum
 
     mSignals.add(SIGINT);
@@ -74,7 +72,7 @@ inline void Server::Run()
 inline void Server::DoAccept()
 {
     mAcceptor.async_accept(
-        [this](std::error_code ec, tcp::socket socket)
+        [this](std::error_code ec, asio::ip::tcp::socket socket)
         {
             if(!ec)
             {
