@@ -5,6 +5,7 @@
 #include "sessionTestWrapper.hpp"
 #include <asio.hpp>
 
+// Verify hex conversion correctness
 TEST(SessionTest, HexConversionIsCorrect) 
 {
     asio::io_context ioc;
@@ -21,6 +22,7 @@ TEST(SessionTest, HexConversionIsCorrect)
     EXPECT_EQ(result, "deadbeef\n");
 }
 
+// Multi-Message Packets: Ensure that if Msg1\nMsg2 arrives in one read, both are processed
 TEST(SessionTest, HandlesMultipleMessagesInOnePacket)
 {
     asio::io_context ioc;
@@ -50,6 +52,7 @@ TEST(SessionTest, HandlesMultipleMessagesInOnePacket)
     EXPECT_TRUE(session->mTailBuffer.empty());
 }
 
+// Verify that messages arriving byte-by-byte are correctly reassembled
 TEST(SessionTest, HandlesExtremeFragmentation) 
 {
     asio::io_context ioc;
@@ -73,6 +76,7 @@ TEST(SessionTest, HandlesExtremeFragmentation)
     EXPECT_EQ(session->mTailBuffer.size(), 0);
 }
 
+// Verify request 'tail' logic when '\n' is present
 TEST(SessionTest, TailOnlyHoldsLeftovers) 
 {
     asio::io_context ioc;
@@ -89,34 +93,7 @@ TEST(SessionTest, TailOnlyHoldsLeftovers)
     EXPECT_EQ(tail, "Bye");
 }
 
-TEST(SessionTest, HandlesEmptyMessages) 
-{
-    asio::io_context ioc;
-    asio::ip::tcp::socket socket(ioc);
-    auto session = std::make_shared<SessionTestWrapper>(std::move(socket));
-
-    // Sending just a newline should result in the hash of an empty string
-    // SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    session->ProcessBuffer("\n", 1);
-    
-    EXPECT_EQ(session->mTailBuffer.size(), 0);
-}
-
-TEST(SessionTest, HandlesWindowsLineEndings) 
-{
-    asio::io_context ioc;
-    asio::ip::tcp::socket socket(ioc);
-    auto session = std::make_shared<SessionTestWrapper>(std::move(socket));
-
-    // "Test\r\n" should hash exactly the same as "Test\n"
-    // We verify by ensuring the tail is cleared correctly and no \r remains
-    session->ProcessBuffer("Test\r\n", 6);
-    
-    EXPECT_TRUE(session->mTailBuffer.empty());
-    // If you add the result-capturing spy we discussed, 
-    // you'd verify the hash matches "Test" (4 chars) not "Test\r" (5 chars).
-}
-
+// Verify request 'tail' logic when '\n' is not present
 TEST(SessionTest, StreamingWithoutNewlinesDoesNotFillTail) 
 {
     asio::io_context ioc;
@@ -130,4 +107,34 @@ TEST(SessionTest, StreamingWithoutNewlinesDoesNotFillTail)
     // Because we use incremental hashing (EVP_DigestUpdate), 
     // the 'A's should be consumed. mTailBuffer should NOT grow.
     EXPECT_EQ(session->mTailBuffer.size(), 0);
+}
+
+// Verify en empty request processing
+TEST(SessionTest, HandlesEmptyMessages) 
+{
+    asio::io_context ioc;
+    asio::ip::tcp::socket socket(ioc);
+    auto session = std::make_shared<SessionTestWrapper>(std::move(socket));
+
+    // Sending just a newline should result in the hash of an empty string
+    // SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    session->ProcessBuffer("\n", 1);
+    
+    EXPECT_EQ(session->mTailBuffer.size(), 0);
+}
+
+// Verify handling messaged terminated with Windows-style "\r\n"
+TEST(SessionTest, HandlesWindowsLineEndings) 
+{
+    asio::io_context ioc;
+    asio::ip::tcp::socket socket(ioc);
+    auto session = std::make_shared<SessionTestWrapper>(std::move(socket));
+
+    // "Test\r\n" should hash exactly the same as "Test\n"
+    // We verify by ensuring the tail is cleared correctly and no \r remains
+    session->ProcessBuffer("Test\r\n", 6);
+    
+    EXPECT_TRUE(session->mTailBuffer.empty());
+    // If you add the result-capturing spy we discussed, 
+    // you'd verify the hash matches "Test" (4 chars) not "Test\r" (5 chars).
 }

@@ -24,7 +24,8 @@ protected:
     }
 };
 
-// Test Lifecycle: Start and Stop via Signal
+// Lifecycle: Confirms the server starts, accepts connections
+// and shuts down gracefully via signals.
 TEST_F(ServerTest, LifecycleGracefulShutdown) 
 {
     unsigned short port = GetFreePort();
@@ -79,7 +80,7 @@ TEST_F(ServerTest, ClientConnectionSuccess)
         serverThread.join();
 }
 
-// 3. Test Concurrency: Multiple clients at once
+// Test Concurrency: Multiple clients at once
 TEST_F(ServerTest, ConcurrentClientConnections) 
 {
     unsigned short port = GetFreePort();
@@ -160,8 +161,8 @@ TEST_F(ServerTest, VerifyIndividualHashResponse)
         serverThread.join();
 }
 
-// Open multiple connections (significantly more than hardware threads).
-// Make multiple responses from every connection and verify the results.
+// Thundering Herd: Spawns 10x more clients than CPU threads to verify
+// thread safety and performance under pressure.
 TEST_F(ServerTest, HandlesThunderingHerd) 
 {
     unsigned short port = GetFreePort();
