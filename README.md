@@ -20,33 +20,46 @@ A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculat
 
 ### Local Compilation and Execution (from project root)
 
-1. Configure and Build:  
+**1. Configure and Build:**  
    cmake -B build -DCMAKE_BUILD_TYPE=Release  
    cmake --build build -j$(nproc)  
 
-2. Run Unit and Integration Tests:  
+**2. Run Unit and Integration Tests:**  
    ./build/server/session_test  
    ./build/server/server_test  
 
-3. Start the Server:  
+**3. Start the Server:**  
    ./build/server/server 8080  
 
-4. Run the Stress Test Client (in a separate terminal):  
+**4. Run the Stress Test Client (in a separate terminal):**  
    ./build/client/client 127.0.0.1 8080  
 
 ---
 
 ## Containerization and Orchestration
 
-The project uses a multi-stage Dockerfile to produce a minimal runtime image (~100MB) by stripping away build tools.
+The project uses a multi-stage Dockerfile to produce a runtime image.
 
 ### Build and Run with Docker
-1. Build the standalone image:
-   docker build -t hashsrv .
 
-2. Run the full stack via Compose:
-   docker compose up --build
+**1. Build images from scratch via Compose:**  
+   docker compose build --no-cache  
 
+**2. Reclaim disk space (Optional):**  
+   docker image prune -f  
+
+**3. Run Unit Tests (Session Logic):**  
+   docker run --rm --entrypoint ./session_test hashsrv_server  
+
+**4. Run Unit Tests (Server Logic):**  
+   docker run --rm --entrypoint ./server_test hashsrv_server  
+
+**5. Run System Integration Test:**  
+    docker compose up --abort-on-container-exit --exit-code-from client  
+
+**6. Start the server (Standalone):**  
+    docker compose up server  
+   
 ---
 
 ## Development & Automation (Scripts)
