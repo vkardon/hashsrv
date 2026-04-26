@@ -36,7 +36,7 @@ A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculat
 
 ---
 
-## Containerization and Orchestration
+## Containerization and Orchestration (from project root)
 
 The project uses a multi-stage Dockerfile to produce a runtime image.
 
