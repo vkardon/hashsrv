@@ -104,11 +104,10 @@ A real-world simulation of massive network load.
 
 | Component | Description |
 | :--- | :--- |
-| server/server.hpp | Thread-pool management and async acceptor logic. |
-| server/session.hpp | Core engine: Async R/W, streaming hashing, and tail-buffer management. |
-| client/client.cpp | Multi-threaded stress-test tool using Berkeley sockets. |
-| include/utils.hpp | RAII Profiling, Hex-LUT conversion, and logging macros. |
-| tests/ | GTest suites for unit and integration testing. |
-| docker/ | Multi-stage Dockerfiles for optimized deployments. |
+| **server/** | C++ source for the async TCP server and session logic. |
+| **server/tests/** | GoogleTest source files for unit and integration testing. |
+| **client/** | C++ source for the high-concurrency stress test client. |
+| **scripts/** | Development, automation, and verification utilities. |
+| **docker/** | Multi-stage Dockerfiles and container configuration. |
 
 ---
