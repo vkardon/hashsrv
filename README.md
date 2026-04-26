@@ -1,8 +1,8 @@
-# 🚀 High-Performance SHA-256 TCP Server
+# High-Performance SHA-256 TCP Server
 
 A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculates SHA-256 hashes for line-terminated strings, utilizing a multi-threaded architecture designed for high throughput and memory efficiency.
 
-## ✨ Key Features
+## Key Features
 
 * Asynchronous Multi-Threading: Distributes network I/O and hash calculations across all available CPU cores using a thread-pooled io_context.
 * Streaming Hash Architecture: Processes data chunks as they arrive via OpenSSL's EVP interface. This allows processing of streams of infinite length without increasing RAM usage.
@@ -12,7 +12,7 @@ A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculat
 
 ---
 
-## 🏗 Build and Run
+## Build and Run
 
 ### Prerequisites
 * OS: Ubuntu 24.04 or compatible Linux (Alma/RHEL)
@@ -36,25 +36,7 @@ A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculat
 
 ---
 
-## 🧪 Comprehensive Testing
-
-The project includes an extensive test suite that validates both the network infrastructure and the core logic.
-
-### 1. Logic and Protocol Tests (session_test)
-* Fragmentation: Verifies that messages arriving byte-by-byte are correctly reassembled.
-* Multi-Message Packets: Ensures that if Msg1\nMsg2 arrives in one read, both are processed.
-* Integrity: Validates the SHA-256 output against known test vectors using a SessionTestWrapper.
-
-### 2. Infrastructure Tests (server_test)
-* Thundering Herd: Spawns 10x more clients than CPU threads to verify thread safety and performance under pressure.
-* Lifecycle: Confirms the server starts, accepts connections, and shuts down gracefully via signals.
-
-### 3. Integration Stress Test (client)
-The custom client simulates a massive load (500 threads making 500 calls each) across multiple runs to ensure the server remains stable and memory-efficient under real-world networking conditions.
-
----
-
-## 🐋 Containerization and Orchestration
+## Containerization and Orchestration
 
 The project uses a multi-stage Dockerfile to produce a minimal runtime image (~100MB) by stripping away build tools.
 
@@ -67,7 +49,58 @@ The project uses a multi-stage Dockerfile to produce a minimal runtime image (~1
 
 ---
 
-## 📂 Project Structure
+## Development & Automation (Scripts)
+
+A suite of Bash scripts is provided in the `scripts/` directory to automate the development lifecycle and verify system integrity.
+
+### CI/CD & Cleanup
+* **`build_and_test.sh`**  
+  Performs a "factory reset" build. It wipes all caches, builds images from scratch, and runs the entire test suite inside containers.  
+  **Usage:** `./scripts/build_and_test.sh`  
+
+* **`docker_clean.sh`**  
+  Deep-cleans the environment by removing all containers, project images, and volumes.  
+  **Usage:** `./scripts/docker_clean.sh`
+
+### Functional Verification
+* **`verify_individual.sh`**  
+  Opens a **new connection for every line** to verify server accuracy against the system's native `sha256sum`.  
+  **Usage:** `./scripts/verify_individual.sh -p 8080`  
+
+* **`verify_multiple.sh`**  
+  Validates **Stream & Chunking Integrity**: It sends a high-speed continuous stream over a single connection to ensure the server correctly identifies message boundaries.  
+  **Usage:** `./scripts/verify_multiple.sh -p 8080 -f test_data.txt`  
+
+---
+
+## Comprehensive Testing
+
+The project employs a multi-layered testing strategy to ensure that high performance never comes at the cost of data integrity.
+
+### 1. Protocol & Logic Verification (`session_test`)  
+Focuses on the core `Session` engine and the "Tail Buffer" logic.  
+* **Fragmentation Recovery:**  
+  Verifies that messages arriving byte-by-byte (the "slow drip" scenario) are correctly reassembled.  
+* **Packet Congestion:**  
+  Ensures that multiple messages arriving in a single TCP frame (`Msg1\nMsg2\n`) are both processed without data loss.  
+* **Cryptographic Integrity:**
+  Validates SHA-256 outputs against known test vectors using a `SessionTestWrapper` to isolate streaming logic.  
+
+### 2. Infrastructure & Concurrency (`server_test`)  
+Validates the thread-pooled `io_context` and the server's stability under pressure.  
+* **Thundering Herd Scenario:**  
+  Spawns 10x more concurrent clients than available CPU threads to verify thread safety and lock-free execution.  
+* **Graceful Lifecycle:**  
+  Confirms the server handles `SIGINT` and `SIGTERM` correctly, ensuring all socket buffers are flushed and threads are joined before exit.  
+
+### 3. Integration Stress Test (`client`)  
+A real-world simulation of massive network load.  
+* **High-Throughput Pressure:**  
+  Orchestrates 500 threads making 500 calls each (250,000 total requests) to monitor for memory leaks, socket exhaustion, or race conditions under sustained high-speed I/O.  
+
+---
+
+## Project Structure
 
 | Component | Description |
 | :--- | :--- |
