@@ -15,23 +15,24 @@ A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculat
 ## 🏗 Build and Run
 
 ### Prerequisites
-* OS: Ubuntu 22.04 or 24.04 or compatible Linux (Alma/RHEL)
-* Dependencies: build-essential, cmake, libasio-dev, libssl-dev, libgtest-dev
+* OS: Ubuntu 24.04 or compatible Linux (Alma/RHEL)
+* Dependencies: build-essential (or Development Tools), cmake, libasio-dev, libssl-dev, libgtest-dev
 
 ### Local Compilation and Execution (from project root)
-1. Configure and Build:
-   cmake -B build -DCMAKE_BUILD_TYPE=Release
-   cmake --build build -j$(nproc)
 
-2. Run Unit and Integration Tests:
-   ./build/server/session_test
-   ./build/server/server_test
+1. Configure and Build:  
+   cmake -B build -DCMAKE_BUILD_TYPE=Release  
+   cmake --build build -j$(nproc)  
 
-3. Start the Server:
-   ./build/server/server 8080
+2. Run Unit and Integration Tests:  
+   ./build/server/session_test  
+   ./build/server/server_test  
 
-4. Run the Stress Test Client (in a separate terminal):
-   ./build/client/client 127.0.0.1 8080
+3. Start the Server:  
+   ./build/server/server 8080  
+
+4. Run the Stress Test Client (in a separate terminal):  
+   ./build/client/client 127.0.0.1 8080  
 
 ---
 
