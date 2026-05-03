@@ -17,6 +17,7 @@ public:
     ~Server() = default;
 
     void Run();
+    void Stop() { mIoContext.stop(); }
 
 private:
     void DoAccept();
@@ -87,10 +88,10 @@ inline void Server::WaitForSignals()
     mSignals.async_wait(
         [this](std::error_code ec, int signalNumber)
         {
-            if (!ec)
+            if(!ec)
             {
                 std::cout << "\nShutdown signal received (" << signalNumber << "). Closing server..." << std::endl;
-                mIoContext.stop(); // This tells all worker threads to exit run()
+                Stop(); // This tells all worker threads to exit run()
             }
         });
 }

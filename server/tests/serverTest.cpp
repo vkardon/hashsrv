@@ -20,7 +20,8 @@ protected:
     {
         asio::io_context ioc;
         asio::ip::tcp::acceptor acceptor(ioc, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
-        return acceptor.local_endpoint().port();
+        unsigned short port = acceptor.local_endpoint().port();
+        return port;
     }
 };
 
@@ -74,7 +75,7 @@ TEST_F(ServerTest, ClientConnectionSuccess)
 
     // Cleanup
     clientSocket.close();
-    raise(SIGINT);
+    server.Stop();
 
     if(serverThread.joinable()) 
         serverThread.join();
@@ -94,8 +95,8 @@ TEST_F(ServerTest, ConcurrentClientConnections)
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     const int numClients = 10;
-    std::vector<std::unique_ptr<asio::ip::tcp::socket>> clients;
     asio::io_context clientIoc;
+    std::vector<std::unique_ptr<asio::ip::tcp::socket>> clients;
 
     // Connect multiple clients simultaneously
     for(int i = 0; i < numClients; ++i)
@@ -110,7 +111,7 @@ TEST_F(ServerTest, ConcurrentClientConnections)
     EXPECT_EQ(clients.size(), numClients);
 
     // Shutdown
-    raise(SIGINT);
+    server.Stop();
 
     if(serverThread.joinable()) 
         serverThread.join();
@@ -127,6 +128,8 @@ TEST_F(ServerTest, PortInUseThrows)
 
     // The Server constructor should throw system_error (EADDRINUSE)
     EXPECT_THROW({ Server server(port); }, asio::system_error);
+    
+    blocker.close();
 }
 
 // Open a single connection, make multiple responses and verify the results
@@ -156,7 +159,7 @@ TEST_F(ServerTest, VerifyIndividualHashResponse)
 
     // Cleanup (bring the server down with SIGINT)
     clientSocket.close();
-    raise(SIGINT);
+    server.Stop();
     if(serverThread.joinable())
         serverThread.join();
 }
@@ -169,46 +172,54 @@ TEST_F(ServerTest, HandlesThunderingHerd)
     Server server(port);
     std::thread serverThread([&server]() { server.Run(); });
 
-    // Allow io_context to spin up
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
     // Connect significantly more clients than hardware threads
-    const int clientCount = std::thread::hardware_concurrency() * 10;
-    std::vector<std::unique_ptr<asio::ip::tcp::socket>> clients;
     asio::io_context clientIoc;
+    const int clientCount = std::thread::hardware_concurrency() * 10;
+    std::vector<std::shared_ptr<asio::ip::tcp::socket>> clients;
+    clients.reserve(clientCount);
 
     // Connection Phase (connect all clients)
     for(int i = 0; i < clientCount; ++i)
     {
-        auto sock = std::make_unique<asio::ip::tcp::socket>(clientIoc);
+        auto sock = std::make_shared<asio::ip::tcp::socket>(clientIoc);
         std::error_code ec;
-        sock->connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), port), ec);
+
+        // Small retry logic makes tests 100% stable regardless of CPU speed
+        int retries = 5;
+        while(retries--)
+        {
+            sock->connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), port), ec);
+            if(!ec)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+
         ASSERT_FALSE(ec) << "Client " << i << " failed to connect";
-        clients.push_back(std::move(sock));
+        clients.push_back(sock);
     }
 
     // Each client communicates with the server in parallel
     std::vector<std::future<void>> futures;
     const int requestsPerClient = 100;
 
-    for(int i = 0; i < clientCount; ++i)
+    for(auto& sock : clients)
     {
         // Launch each client's conversation in its own thread
-        futures.push_back(std::async(std::launch::async, [&sock = *clients[i], i, requestsPerClient]() 
+        futures.push_back(std::async(std::launch::async, [sock, requestsPerClient]() 
             {
                 for(int n = 0; n < requestsPerClient; ++n) 
                 {
-                    ExchangeAndVerify(sock, n);
+                    ExchangeAndVerify(*sock, n);
                 }
             }));
     }
 
     // Wait for clients to finish
-    for (auto& f : futures)
+    for(auto& f : futures)
         f.get(); 
 
     // Cleanup (bring the server down with SIGINT)
-    raise(SIGINT);
+    server.Stop();
     if(serverThread.joinable())
         serverThread.join();
 }

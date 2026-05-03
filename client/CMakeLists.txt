@@ -24,6 +24,7 @@ target_include_directories(client PRIVATE
 # Link Libraries 
 target_link_libraries(client PRIVATE 
     # Add other libraries here
+    Threads::Threads
 )
 
 # Compiler Flags: -Wall
