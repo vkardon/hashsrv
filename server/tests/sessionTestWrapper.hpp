@@ -9,33 +9,8 @@ class SessionTestWrapper : public Session
 public:
     using Session::Session;
     using Session::ProcessBuffer;
-    using Session::HexToString;
     using Session::mTailBuffer;
 };
-
-// Helper to consolidate EVP hashing and Hex conversion
-inline std::string CalculateExpected(const std::string& input)
-{
-    // Perform binary SHA-256
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
-    EVP_DigestUpdate(ctx, input.data(), input.size());
-
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    unsigned int len = 0;
-    EVP_DigestFinal_ex(ctx, hash, &len);
-    EVP_MD_CTX_free(ctx);
-
-    // Convert to Hex using the production HexToString logic
-    asio::io_context ioc;
-    asio::ip::tcp::socket dummySocket(ioc);
-    SessionTestWrapper wrapper(std::move(dummySocket));
-    
-    std::string hexResult;
-    wrapper.HexToString(hexResult, hash, len);
-    
-    return hexResult;
-}
 
 // Helper to generate a payload, send it to server and verify the response hash
 void ExchangeAndVerify(asio::ip::tcp::socket& clientSocket, int id = 0)
@@ -43,7 +18,9 @@ void ExchangeAndVerify(asio::ip::tcp::socket& clientSocket, int id = 0)
     // Generate unique payload and calculate the expected result
     std::string inputData = "Calculate_SHA256_Integrity_Check: Request_ID_" + 
                                 std::to_string(id) + "_" + std::to_string(std::rand());
-    std::string expected = CalculateExpected(inputData);
+    Hasher hasher;
+    hasher.Update(inputData);
+    std::string expected = hasher.FinalizeHex();
 
     // Append newline to trigger ProcessBuffer logic and write to the stream
     std::string request = inputData + "\n";

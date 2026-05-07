@@ -8,15 +8,11 @@
 // Verify hex conversion correctness
 TEST(SessionTest, HexConversionIsCorrect) 
 {
-    asio::io_context ioc;
-    asio::ip::tcp::socket socket(ioc);
-    auto session = std::make_shared<SessionTestWrapper>(std::move(socket));
-
     // Test with a known value: 0xDE 0xAD 0xBE 0xEF
-    unsigned char mockHash[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    unsigned char mockHash[] = { 0xDE, 0xAD, 0xBE, 0xEF };
 
-    std::string result;
-    session->HexToString(result, mockHash, 4);
+    Hasher hasher;
+    std::string result = hasher.HexToString(mockHash, 4);
 
     // Expecting "deadbeef\n" (including your newline terminator)
     EXPECT_EQ(result, "deadbeef\n");
@@ -32,7 +28,8 @@ TEST(SessionTest, HandlesMultipleMessagesInOnePacket)
     // Scenario: A single TCP packet arrives containing one full message 
     // and the start of a second message.
     const char* input = "Part1\nPart2";
-    session->ProcessBuffer(input, strlen(input));
+    std::string hexOut;
+    session->ProcessBuffer(input, strlen(input), hexOut);
 
     // The tail buffer should contain "Part2"
     // Because ProcessBuffer finds the first '\n', hashes "Part1", 
@@ -46,8 +43,8 @@ TEST(SessionTest, HandlesMultipleMessagesInOnePacket)
     EXPECT_EQ(tailContent, "Part2");    
 
     // 3. Simulate the finishing newline arriving in the next packet (next read cycle)
-    session->ProcessBuffer("\n", 1);
-    
+    session->ProcessBuffer("\n", 1, hexOut);
+
     // After processing the newline, the tail should now be empty
     EXPECT_TRUE(session->mTailBuffer.empty());
 }
@@ -62,17 +59,18 @@ TEST(SessionTest, HandlesExtremeFragmentation)
     // Simulate "Hi\n" arriving in 3 separate packets
 
     // 1. Send "H" - It gets hashed immediately, tail stays empty
-    session->ProcessBuffer("H", 1);
+    std::string hexOut;
+    session->ProcessBuffer("H", 1, hexOut);
     EXPECT_EQ(session->mTailBuffer.size(), 0); 
 
     // 2. Send "i" - It gets hashed immediately, tail stays empty
-    session->ProcessBuffer("i", 1);
+    session->ProcessBuffer("i", 1, hexOut);
     EXPECT_EQ(session->mTailBuffer.size(), 0);
 
     // 3. Send "\n" - This triggers the finalization
     // Since we are in a test and can't easily "read" the async write,
     // we can check if the hash context was reset or if the tail is still empty.
-    session->ProcessBuffer("\n", 1);
+    session->ProcessBuffer("\n", 1, hexOut);
     EXPECT_EQ(session->mTailBuffer.size(), 0);
 }
 
@@ -85,7 +83,8 @@ TEST(SessionTest, TailOnlyHoldsLeftovers)
 
     // Send "Hi\nBye"
     // "Hi" is hashed, "\n" triggers finalization, "Bye" goes to tail.
-    session->ProcessBuffer("Hi\nBye", 6);
+    std::string hexOut;
+    session->ProcessBuffer("Hi\nBye", 6, hexOut);
 
     EXPECT_EQ(session->mTailBuffer.size(), 3);
     
@@ -102,7 +101,8 @@ TEST(SessionTest, StreamingWithoutNewlinesDoesNotFillTail)
 
     // Send a large-ish chunk without a newline
     std::string largeInput(1000, 'A');
-    session->ProcessBuffer(largeInput.c_str(), largeInput.size());
+    std::string hexOut;
+    session->ProcessBuffer(largeInput.c_str(), largeInput.size(), hexOut);
 
     // Because we use incremental hashing (EVP_DigestUpdate), 
     // the 'A's should be consumed. mTailBuffer should NOT grow.
@@ -118,8 +118,9 @@ TEST(SessionTest, HandlesEmptyMessages)
 
     // Sending just a newline should result in the hash of an empty string
     // SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    session->ProcessBuffer("\n", 1);
-    
+    std::string hexOut;
+    session->ProcessBuffer("\n", 1, hexOut);
+
     EXPECT_EQ(session->mTailBuffer.size(), 0);
 }
 
@@ -132,8 +133,9 @@ TEST(SessionTest, HandlesWindowsLineEndings)
 
     // "Test\r\n" should hash exactly the same as "Test\n"
     // We verify by ensuring the tail is cleared correctly and no \r remains
-    session->ProcessBuffer("Test\r\n", 6);
-    
+    std::string hexOut;
+    session->ProcessBuffer("Test\r\n", 6, hexOut);
+
     EXPECT_TRUE(session->mTailBuffer.empty());
     // If you add the result-capturing spy we discussed, 
     // you'd verify the hash matches "Test" (4 chars) not "Test\r" (5 chars).
