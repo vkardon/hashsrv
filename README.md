@@ -2,6 +2,12 @@
 
 A C++ asynchronous TCP server built with Asio and OpenSSL. This project calculates SHA-256 hashes for line-terminated strings, utilizing a multi-threaded architecture designed for high throughput and memory efficiency.
 
+#### ⚠️ Disclaimer
+**This is an Experimental/Interview Demo Project.**  
+It is intended for demonstration purposes only and is **not suitable for production environments**. This code has not been audited for security or stability in a live setting.
+
+---
+
 ## Key Features
 
 * Asynchronous Multi-Threading: Distributes network I/O and hash calculations across all available CPU cores using a thread-pooled io_context.
